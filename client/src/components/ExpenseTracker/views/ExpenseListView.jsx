@@ -16,7 +16,7 @@ const ExpenseListView = ({
   ).filter((exp) => exp.paidBy === currentUser);
 
   const handleExport = () => {
-    exportToCSV(expenses, currentUser, selectedMonth, selectedYear);
+    exportToCSV(userExpenses, currentUser, selectedMonth, selectedYear);
   };
 
   const handleDelete = async (id) => {

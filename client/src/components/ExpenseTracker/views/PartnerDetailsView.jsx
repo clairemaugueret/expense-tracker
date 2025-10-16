@@ -1,6 +1,7 @@
 // client/src/components/ExpenseTracker/views/PartnerDetailsView.jsx
 import React from "react";
-import { filterExpensesByMonth } from "../../../utils/dateUtils";
+import { filterExpensesByMonth, exportToCSV } from "../../../utils/dateUtils";
+import { USERS } from "../../../utils/constants";
 
 const PartnerDetailsView = ({
   expenses,
@@ -8,17 +9,33 @@ const PartnerDetailsView = ({
   selectedMonth,
   selectedYear,
 }) => {
+  const partner = USERS.filter((u) => {
+    return u !== currentUser;
+  });
+
   const partnerExpenses = filterExpensesByMonth(
     expenses,
     selectedMonth,
     selectedYear
   ).filter((exp) => exp.paidBy !== currentUser);
 
+  const handleExport = () => {
+    exportToCSV(partnerExpenses, partner, selectedMonth, selectedYear);
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-lg">
-      <h2 className="text-2xl font-bold mb-6 text-gray-800">
-        🔍 Dépenses du partenaire
-      </h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">
+          🔍 Dépenses du partenaire
+        </h2>
+        <button
+          onClick={handleExport}
+          className="bg-green-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-600 transition"
+        >
+          📥 CSV
+        </button>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
