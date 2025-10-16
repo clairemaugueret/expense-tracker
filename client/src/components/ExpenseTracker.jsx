@@ -1002,11 +1002,17 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                       Catégorie
                     </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Méthode
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Compte
+                    </th>
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
                       Montant
                     </th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">
-                      Action
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -1047,6 +1053,12 @@ const ExpenseTracker = ({ user, onLogout }) => {
                           <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
                             {exp.category || "N/A"}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {exp.paymentMethod || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {exp.bankAccount || "-"}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-bold">
                           {exp.amount.toFixed(2)} €
@@ -1095,7 +1107,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-blue-50">
+                <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                       Date
@@ -1105,6 +1117,12 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                       Catégorie
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Méthode
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Compte
                     </th>
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
                       Montant
@@ -1148,6 +1166,12 @@ const ExpenseTracker = ({ user, onLogout }) => {
                           <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs">
                             {exp.category || "N/A"}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {exp.paymentMethod || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {exp.bankAccount || "-"}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-bold">
                           {exp.amount.toFixed(2)} €

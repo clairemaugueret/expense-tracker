@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import connectDB from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { startRecurringExpensesJob } from "./jobs/recurringExpenses.js";
+import morgan from "morgan";
 
 // Routes
 import authRoutes from "./routes/auth.js";
@@ -19,6 +20,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Ajouter le middleware Morgan (avant vos routes)
+app.use(morgan("dev")); // Format 'dev' est coloré et lisible
 
 // ✅ Tu peux commenter la ligne suivante si tu veux lancer sans Mongo :
 connectDB();
