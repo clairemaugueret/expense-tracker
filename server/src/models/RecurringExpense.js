@@ -1,3 +1,4 @@
+// server/src/models/RecurringExpense.js
 import mongoose from "mongoose";
 
 const recurringExpenseSchema = new mongoose.Schema(

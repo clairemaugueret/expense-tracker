@@ -1,3 +1,4 @@
+// server/src/middleware/errorHandler.js
 export const errorHandler = (err, req, res, next) => {
   console.error("❌ Erreur:", err.message);
 

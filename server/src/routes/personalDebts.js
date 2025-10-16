@@ -1,3 +1,4 @@
+// server/src/routes/personalDebts.js
 import express from "express";
 import { body, validationResult } from "express-validator";
 import PersonalDebt from "../models/PersonalDebt.js";
@@ -50,12 +51,10 @@ router.post(
       const { paidBy, owedBy } = req.body;
 
       if (paidBy === owedBy) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Le créancier et le débiteur doivent être différents",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Le créancier et le débiteur doivent être différents",
+        });
       }
 
       const personalDebt = await PersonalDebt.create({
@@ -86,12 +85,10 @@ router.put("/:id/mark-paid", async (req, res, next) => {
     }
 
     if (personalDebt.isPaid) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Cette avance a déjà été remboursée",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Cette avance a déjà été remboursée",
+      });
     }
 
     personalDebt.isPaid = true;

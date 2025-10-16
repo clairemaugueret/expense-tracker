@@ -1,3 +1,4 @@
+// server/src/routes/expenses.js
 import express from "express";
 import { body, validationResult } from "express-validator";
 import Expense from "../models/Expense.js";

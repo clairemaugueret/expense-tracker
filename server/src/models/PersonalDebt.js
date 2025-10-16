@@ -1,3 +1,4 @@
+// server/src/models/PersonalDebt.js
 import mongoose from "mongoose";
 
 const personalDebtSchema = new mongoose.Schema(

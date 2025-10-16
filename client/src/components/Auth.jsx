@@ -1,3 +1,4 @@
+// client/src/components/Auth.jsx
 import React, { useState } from "react";
 
 const Auth = ({ onLogin }) => {

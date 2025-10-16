@@ -1,3 +1,4 @@
+// server/src/routes/recurring.js
 import express from "express";
 import RecurringExpense from "../models/RecurringExpense.js";
 import { protect } from "../middleware/auth.js";
