@@ -101,4 +101,21 @@ export const recurringAPI = {
     });
     return response.json();
   },
+
+  update: async (id, data) => {
+    const response = await fetch(`${API_URL}/recurring/${id}`, {
+      method: "PUT",
+      headers: getJsonHeaders(),
+      body: JSON.stringify(data),
+    });
+    return response.json();
+  },
+
+  delete: async (id) => {
+    const response = await fetch(`${API_URL}/recurring/${id}`, {
+      method: "DELETE",
+      headers: getJsonHeaders(),
+    });
+    return response.json();
+  },
 };

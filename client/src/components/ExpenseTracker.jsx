@@ -11,13 +11,22 @@ import {
 const ExpenseTracker = ({ user, onLogout }) => {
   const [expenses, setExpenses] = useState([]);
   const [recurringExpenses, setRecurringExpenses] = useState([]);
+  const [editingRecurring, setEditingRecurring] = useState(null);
+  const [recurringForm, setRecurringForm] = useState({
+    amount: "",
+    paidBy: "",
+    description: "",
+    paymentMethod: "",
+    bankAccount: "",
+    category: "",
+    recurrence: "",
+  });
   const [reimbursements, setReimbursements] = useState([]);
   const [personalDebts, setPersonalDebts] = useState([]);
   const [users, setUsers] = useState([]);
   const [view, setView] = useState("dashboard");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [formData, setFormData] = useState({
     amount: "",
@@ -83,10 +92,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
     setUsers(localUsers);
     loadAllData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, view]);
 
   const loadAllData = async () => {
-    setLoading(true);
     setError("");
     try {
       const startDate = new Date(selectedYear, selectedMonth, 1).toISOString();
@@ -114,8 +122,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
     } catch (err) {
       setError("Erreur de chargement des données");
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -126,7 +132,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
       return;
     }
 
-    setLoading(true);
     try {
       const expenseData = {
         ...formData,
@@ -156,8 +161,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
     } catch (err) {
       alert("Erreur de connexion au serveur");
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -179,7 +182,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
       return;
     }
 
-    setLoading(true);
     try {
       const response = await personalDebtsAPI.create({
         amount,
@@ -200,8 +202,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
     } catch (err) {
       alert("Erreur de connexion au serveur");
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -216,8 +216,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
       alert("Veuillez remplir tous les champs");
       return;
     }
-
-    setLoading(true);
     try {
       const response = await reimbursementsAPI.create({
         amount,
@@ -236,14 +234,11 @@ const ExpenseTracker = ({ user, onLogout }) => {
     } catch (err) {
       alert("Erreur de connexion au serveur");
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
   const markDebtAsPaid = async (debtId) => {
     if (window.confirm("Marquer comme remboursée ?")) {
-      setLoading(true);
       try {
         const response = await personalDebtsAPI.markPaid(debtId);
 
@@ -256,15 +251,12 @@ const ExpenseTracker = ({ user, onLogout }) => {
       } catch (err) {
         alert("Erreur de connexion au serveur");
         console.error(err);
-      } finally {
-        setLoading(false);
       }
     }
   };
 
   const deleteExpense = async (id) => {
     if (window.confirm("Supprimer cette dépense ?")) {
-      setLoading(true);
       try {
         const response = await expensesAPI.delete(id);
 
@@ -276,9 +268,77 @@ const ExpenseTracker = ({ user, onLogout }) => {
       } catch (err) {
         alert("Erreur de connexion au serveur");
         console.error(err);
-      } finally {
-        setLoading(false);
       }
+    }
+  };
+
+  const handleDeleteRecurring = async (id) => {
+    if (
+      !window.confirm(
+        "Supprimer cette dépense récurrente ?\n\n⚠️ Les dépenses générées pour le mois en cours seront également supprimées."
+      )
+    )
+      return;
+
+    const res = await recurringAPI.delete(id);
+    if (res.success) {
+      alert(
+        `Supprimée ! (${
+          res.removedExpensesThisMonth || 0
+        } dépense(s) retirée(s) ce mois)`
+      );
+      await loadAllData();
+    } else {
+      alert(res.message || "Erreur lors de la suppression");
+    }
+  };
+
+  const openEditRecurring = (exp) => {
+    setEditingRecurring(exp);
+    setRecurringForm({
+      amount: exp.amount ?? "",
+      paidBy: exp.paidBy ?? "",
+      description: exp.description ?? "",
+      paymentMethod: exp.paymentMethod ?? "",
+      bankAccount: exp.bankAccount ?? "",
+      category: exp.category ?? "",
+      recurrence: exp.recurrence ?? "mensuelle",
+    });
+  };
+
+  const closeEditRecurring = () => {
+    setEditingRecurring(null);
+  };
+
+  const handleRecurringFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setRecurringForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const submitEditRecurring = async (e) => {
+    e.preventDefault();
+    if (!editingRecurring) return;
+
+    const payload = {
+      ...recurringForm,
+      amount: parseFloat(recurringForm.amount),
+      // startDate: string(yyyy-mm-dd) -> Date ISO côté API (Mongoose acceptera le cast)
+    };
+
+    const res = await recurringAPI.update(editingRecurring._id, payload);
+    if (res.success) {
+      alert(
+        `Modifiée ! (${
+          res.propagatedThisMonth || 0
+        } occurrence(s) mise(s) à jour ce mois)`
+      );
+      closeEditRecurring();
+      await loadAllData();
+    } else {
+      alert(res.message || "Erreur lors de la modification");
     }
   };
 
@@ -480,14 +540,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </div>
         </div>
       </nav>
-
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6">
-            <p className="text-lg font-semibold">Chargement...</p>
-          </div>
-        </div>
-      )}
 
       {error && (
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -1116,8 +1168,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                   59
                 );
                 return (
-                  exp.paidBy?.username !== user.username &&
-                  exp.paidBy !== user.username &&
+                  exp.paidBy !== user &&
                   expDate >= startDate &&
                   expDate <= endDate
                 );
@@ -1153,6 +1204,20 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     <span className="px-3 py-1 bg-purple-500 text-white rounded-lg text-sm font-semibold">
                       {exp.category}
                     </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openEditRecurring(exp)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecurring(exp._id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1484,6 +1549,176 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </div>
         )}
       </div>
+
+      {/** MODALE EDITION DEPENSES RECURRENTES */}
+      {editingRecurring && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="text-xl font-bold text-gray-800">
+                Modifier la dépense récurrente
+              </h3>
+              <button
+                onClick={closeEditRecurring}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                aria-label="Fermer"
+              >
+                ×
+              </button>
+            </div>
+
+            <form
+              onSubmit={submitEditRecurring}
+              className="px-6 py-6 space-y-4"
+            >
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Montant (€)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    name="amount"
+                    value={recurringForm.amount}
+                    onChange={handleRecurringFormChange}
+                    required
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Payé par
+                  </label>
+                  <select
+                    name="paidBy"
+                    value={recurringForm.paidBy}
+                    onChange={handleRecurringFormChange}
+                    required
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="">Sélectionner...</option>
+                    {users.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Description
+                </label>
+                <input
+                  type="text"
+                  name="description"
+                  value={recurringForm.description}
+                  onChange={handleRecurringFormChange}
+                  required
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Méthode
+                  </label>
+                  <select
+                    name="paymentMethod"
+                    value={recurringForm.paymentMethod}
+                    onChange={handleRecurringFormChange}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="">Sélectionner...</option>
+                    {paymentMethods.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Banque / Compte
+                  </label>
+                  <input
+                    type="text"
+                    name="bankAccount"
+                    value={recurringForm.bankAccount}
+                    onChange={handleRecurringFormChange}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                    placeholder="Ex: Compte joint"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Catégorie
+                  </label>
+                  <select
+                    name="category"
+                    value={recurringForm.category}
+                    onChange={handleRecurringFormChange}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="">Sélectionner...</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Fréquence
+                  </label>
+                  <select
+                    name="recurrence"
+                    value={recurringForm.recurrence}
+                    onChange={handleRecurringFormChange}
+                    required
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="hebdomadaire">Hebdomadaire</option>
+                    <option value="mensuelle">Mensuelle</option>
+                    <option value="trimestrielle">Trimestrielle</option>
+                    <option value="annuelle">Annuelle</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeEditRecurring}
+                  className="px-4 py-2 rounded-lg border-2 border-gray-200 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"
+                >
+                  Enregistrer
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 pt-2">
+                ⚠️ Changer la fréquence modifie les prochaines générations. Les
+                dépenses déjà créées ce mois-ci sont mises à jour pour les
+                champs ci-dessus (montant, payeur, description, méthode, compte,
+                catégorie), mais leur date ne bouge pas.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
