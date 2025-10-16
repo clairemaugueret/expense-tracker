@@ -15,6 +15,11 @@ const reimbursementSchema = new mongoose.Schema(
       trim: true,
     },
     date: { type: Date, required: true, default: Date.now },
+    settlesPersonalDebts: { type: Boolean, default: false },
+    personalDebtIds: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "PersonalDebt" },
+    ],
+    notes: { type: String, default: "" },
   },
   { timestamps: true }
 );

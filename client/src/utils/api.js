@@ -83,6 +83,14 @@ export const reimbursementsAPI = {
     });
     return response.json();
   },
+
+  delete: async (id) => {
+    const response = await fetch(`${API_URL}/reimbursements/${id}`, {
+      method: "DELETE",
+      headers: getJsonHeaders(),
+    });
+    return response.json();
+  },
 };
 
 // API Recurring Expenses

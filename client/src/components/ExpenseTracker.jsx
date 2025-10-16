@@ -211,21 +211,64 @@ const ExpenseTracker = ({ user, onLogout }) => {
     const from = e.target.from.value;
     const to = e.target.to.value;
     const date = e.target.date.value;
+    const notes = e.target.notes.value;
+    const settlesPersonalDebts = e.target.settlesPersonalDebts.checked;
+
+    // Récupérer les IDs des avances sélectionnées
+    const personalDebtIds = [];
+    if (settlesPersonalDebts) {
+      const checkboxes = e.target.querySelectorAll(
+        'input[name="personalDebtIds"]:checked'
+      );
+      checkboxes.forEach((checkbox) => personalDebtIds.push(checkbox.value));
+    }
 
     if (!amount || !from || !to) {
-      alert("Veuillez remplir tous les champs");
+      alert("Veuillez remplir tous les champs obligatoires");
       return;
     }
+
+    if (from === to) {
+      alert("Le payeur et le bénéficiaire doivent être différents");
+      return;
+    }
+
+    // Vérifier que les avances sélectionnées correspondent au sens du paiement
+    if (settlesPersonalDebts && personalDebtIds.length > 0) {
+      const selectedDebts = personalDebts.filter(
+        (debt) => personalDebtIds.includes(debt._id) && !debt.isPaid
+      );
+
+      const invalidDebts = selectedDebts.filter(
+        (debt) => debt.owedBy !== from || debt.paidBy !== to
+      );
+
+      if (invalidDebts.length > 0) {
+        alert(
+          `Attention : ${invalidDebts.length} avance(s) sélectionnée(s) ne correspondent pas au sens du paiement (${from} → ${to})`
+        );
+        return;
+      }
+    }
+
     try {
       const response = await reimbursementsAPI.create({
         amount,
         from,
         to,
         date,
+        settlesPersonalDebts,
+        personalDebtIds,
+        notes,
       });
 
       if (response.success) {
-        alert("Remboursement enregistré !");
+        const settledCount = response.settledDebtsCount || 0;
+        let message = "✅ Remboursement enregistré !";
+        if (settledCount > 0) {
+          message += `\n${settledCount} avance(s) personnelle(s) marquée(s) comme réglée(s).`;
+        }
+        alert(message);
         e.target.reset();
         await loadAllData();
       } else {
@@ -236,6 +279,84 @@ const ExpenseTracker = ({ user, onLogout }) => {
       console.error(err);
     }
   };
+
+  const deleteReimbursement = async (id) => {
+    if (
+      window.confirm(
+        "⚠️ Supprimer ce remboursement ?\n\nSi ce paiement avait réglé des avances personnelles, elles seront remises en attente."
+      )
+    ) {
+      try {
+        const response = await reimbursementsAPI.delete(id);
+
+        if (response.success) {
+          const unsettledCount = response.unsettledDebtsCount || 0;
+          let message = "✅ Remboursement supprimé !";
+          if (unsettledCount > 0) {
+            message += `\n${unsettledCount} avance(s) remise(s) en attente.`;
+          }
+          alert(message);
+          await loadAllData();
+        } else {
+          alert(response.message || "Erreur lors de la suppression");
+        }
+      } catch (err) {
+        alert("Erreur de connexion au serveur");
+        console.error(err);
+      }
+    }
+  };
+
+  const setupPersonalDebtsToggle = () => {
+    const checkbox = document.getElementById("settlesPersonalDebts");
+    const selector = document.getElementById("personalDebtsSelector");
+
+    if (checkbox && selector) {
+      checkbox.addEventListener("change", function () {
+        if (this.checked) {
+          selector.classList.remove("hidden");
+        } else {
+          selector.classList.add("hidden");
+          // Décocher toutes les avances
+          const debtCheckboxes = selector.querySelectorAll(
+            'input[name="personalDebtIds"]'
+          );
+          debtCheckboxes.forEach((cb) => (cb.checked = false));
+        }
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (view === "reimburse") {
+      setupPersonalDebtsToggle();
+      const timer = setTimeout(() => {
+        const checkbox = document.getElementById("settlesPersonalDebts");
+        const selector = document.getElementById("personalDebtsSelector");
+
+        if (checkbox && selector) {
+          // Retirer les anciens listeners pour éviter les doublons
+          checkbox.replaceWith(checkbox.cloneNode(true));
+          const newCheckbox = document.getElementById("settlesPersonalDebts");
+
+          newCheckbox.addEventListener("change", function () {
+            if (this.checked) {
+              selector.classList.remove("hidden");
+            } else {
+              selector.classList.add("hidden");
+              // Décocher toutes les avances
+              const debtCheckboxes = selector.querySelectorAll(
+                'input[name="personalDebtIds"]'
+              );
+              debtCheckboxes.forEach((cb) => (cb.checked = false));
+            }
+          });
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [view, personalDebts]);
 
   const markDebtAsPaid = async (debtId) => {
     if (window.confirm("Marquer comme remboursée ?")) {
@@ -824,6 +945,182 @@ const ExpenseTracker = ({ user, onLogout }) => {
                   </p>
                 )}
               </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-6 shadow-lg text-white">
+              <h3 className="text-xl font-bold mb-4">
+                💸 Paiements effectués ce mois
+              </h3>
+
+              {reimbursements.filter((reimb) => {
+                const reimbDate = new Date(reimb.date);
+                const startDate = new Date(selectedYear, selectedMonth, 1);
+                const endDate = new Date(
+                  selectedYear,
+                  selectedMonth + 1,
+                  0,
+                  23,
+                  59,
+                  59
+                );
+                return reimbDate >= startDate && reimbDate <= endDate;
+              }).length > 0 ? (
+                <>
+                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                    {/* Total des paiements */}
+                    <div className="bg-white rounded-xl p-4 shadow-lg">
+                      <h4 className="text-sm font-semibold text-gray-600 mb-1">
+                        Total payé
+                      </h4>
+                      <p className="text-2xl font-bold text-purple-600">
+                        {reimbursements
+                          .filter((reimb) => {
+                            const reimbDate = new Date(reimb.date);
+                            const startDate = new Date(
+                              selectedYear,
+                              selectedMonth,
+                              1
+                            );
+                            const endDate = new Date(
+                              selectedYear,
+                              selectedMonth + 1,
+                              0,
+                              23,
+                              59,
+                              59
+                            );
+                            return (
+                              reimbDate >= startDate && reimbDate <= endDate
+                            );
+                          })
+                          .reduce((sum, reimb) => sum + reimb.amount, 0)
+                          .toFixed(2)}{" "}
+                        €
+                      </p>
+                    </div>
+
+                    {/* Nombre de paiements */}
+                    <div className="bg-white rounded-xl p-4 shadow-lg">
+                      <h4 className="text-sm font-semibold text-gray-600 mb-1">
+                        Nombre de paiements
+                      </h4>
+                      <p className="text-2xl font-bold text-pink-600">
+                        {
+                          reimbursements.filter((reimb) => {
+                            const reimbDate = new Date(reimb.date);
+                            const startDate = new Date(
+                              selectedYear,
+                              selectedMonth,
+                              1
+                            );
+                            const endDate = new Date(
+                              selectedYear,
+                              selectedMonth + 1,
+                              0,
+                              23,
+                              59,
+                              59
+                            );
+                            return (
+                              reimbDate >= startDate && reimbDate <= endDate
+                            );
+                          }).length
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Liste des derniers paiements */}
+                  <div className="bg-white rounded-xl p-4 shadow-lg">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                      Derniers paiements
+                    </h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {reimbursements
+                        .filter((reimb) => {
+                          const reimbDate = new Date(reimb.date);
+                          const startDate = new Date(
+                            selectedYear,
+                            selectedMonth,
+                            1
+                          );
+                          const endDate = new Date(
+                            selectedYear,
+                            selectedMonth + 1,
+                            0,
+                            23,
+                            59,
+                            59
+                          );
+                          return reimbDate >= startDate && reimbDate <= endDate;
+                        })
+                        .slice(0, 5)
+                        .map((reimb) => (
+                          <div
+                            key={reimb._id}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-800">
+                                <span className="text-purple-600">
+                                  {reimb.amount.toFixed(2)} €
+                                </span>{" "}
+                                <span className="text-gray-500 text-xs">
+                                  {new Date(reimb.date).toLocaleDateString()}
+                                </span>
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                {reimb.from} → {reimb.to}
+                                {reimb.settlesPersonalDebts && (
+                                  <span className="ml-2 inline-block px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
+                                    ✓ Avances réglées
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+
+                    {reimbursements.filter((reimb) => {
+                      const reimbDate = new Date(reimb.date);
+                      const startDate = new Date(
+                        selectedYear,
+                        selectedMonth,
+                        1
+                      );
+                      const endDate = new Date(
+                        selectedYear,
+                        selectedMonth + 1,
+                        0,
+                        23,
+                        59,
+                        59
+                      );
+                      return reimbDate >= startDate && reimbDate <= endDate;
+                    }).length > 5 && (
+                      <button
+                        onClick={() => setView("reimburse")}
+                        className="mt-3 w-full py-2 text-sm font-semibold text-purple-600 hover:text-purple-700 transition"
+                      >
+                        Voir tous les paiements →
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="bg-white rounded-xl p-6 shadow-lg text-center">
+                  <p className="text-gray-600 mb-3">
+                    Aucun paiement enregistré ce mois
+                  </p>
+                  <button
+                    onClick={() => setView("reimburse")}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-pink-700 transition"
+                  >
+                    💸 Enregistrer un paiement
+                  </button>
+                </div>
+              )}
             </div>
 
             {categoryData.length > 0 && (
@@ -1506,88 +1803,292 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </div>
         )}
 
-        {/** SECTION REMBOURSEMENT */}
+        {/** SECTION REMBOURSER */}
         {view === "reimburse" && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg max-w-2xl mx-auto">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">
-              💸 Remboursement
-            </h2>
-            <form onSubmit={handleReimbursement} className="space-y-4 mb-8">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    De
-                  </label>
-                  <select
-                    name="from"
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Sélectionner...</option>
-                    {users.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    À
-                  </label>
-                  <select
-                    name="to"
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Sélectionner...</option>
-                    {users.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Montant
-                  </label>
-                  <input
-                    type="number"
-                    name="amount"
-                    step="0.01"
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    name="date"
-                    defaultValue={new Date().toISOString().split("T")[0]}
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-xl font-bold hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg"
-              >
-                Enregistrer
-              </button>
-            </form>
+          <div className="space-y-6 max-w-4xl mx-auto">
+            {/* ===== RÉCAPITULATIF DU BILAN ===== */}
+            <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-2xl p-6 shadow-lg text-white">
+              <h2 className="text-2xl font-bold mb-6">
+                💸 Remboursement du mois
+              </h2>
 
-            <h3 className="text-xl font-bold mb-4 text-gray-800">Historique</h3>
-            <div className="space-y-3">
-              {reimbursements
-                .filter((reimb) => {
+              {/* Dépenses du pot commun */}
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-xl p-4 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-1">
+                    Total {balance.user1}
+                  </h3>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {balance.person1Total.toFixed(2)} €
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-1">
+                    Total {balance.user2}
+                  </h3>
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {balance.person2Total.toFixed(2)} €
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-1">
+                    Total du mois
+                  </h3>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {balance.totalExpenses.toFixed(2)} €
+                  </p>
+                </div>
+              </div>
+
+              {/* Avances personnelles */}
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-white rounded-xl p-4 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-1">
+                    Avances {balance.user1}
+                  </h3>
+                  <p className="text-2xl font-bold text-amber-600">
+                    {personalDebtsBalance.person1Owes.toFixed(2)} €
+                  </p>
+                </div>
+                <div className="bg-white rounded-xl p-4 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-1">
+                    Avances {balance.user2}
+                  </h3>
+                  <p className="text-2xl font-bold text-amber-600">
+                    {personalDebtsBalance.person2Owes.toFixed(2)} €
+                  </p>
+                </div>
+              </div>
+
+              {/* Balance finale */}
+              <div className="bg-white rounded-xl p-6 shadow-lg">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                  💳 Balance finale à équilibrer
+                </h3>
+                {balance.owedAmount > 0 ? (
+                  <p className="text-xl text-gray-700">
+                    <span className="font-bold text-gray-800">
+                      {balance.owedBy}
+                    </span>{" "}
+                    doit{" "}
+                    <span className="font-bold text-3xl text-green-600">
+                      {balance.owedAmount.toFixed(2)} €
+                    </span>{" "}
+                    à{" "}
+                    <span className="font-bold text-gray-800">
+                      {balance.owedTo}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-2xl font-bold text-green-600">
+                    ✅ Aucune dette !
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* ===== FORMULAIRE D'ENREGISTREMENT ===== */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg">
+              <h3 className="text-xl font-bold mb-4 text-gray-800">
+                📝 Enregistrer un paiement
+              </h3>
+
+              <form onSubmit={handleReimbursement} className="space-y-4">
+                {/* Montant et date */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Montant du paiement (€) *
+                    </label>
+                    <input
+                      type="number"
+                      name="amount"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Date du paiement *
+                    </label>
+                    <input
+                      type="date"
+                      name="date"
+                      defaultValue={new Date().toISOString().split("T")[0]}
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* De/À */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      De (payeur) *
+                    </label>
+                    <select
+                      name="from"
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {users.map((user) => (
+                        <option key={user} value={user}>
+                          {user}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      À (bénéficiaire) *
+                    </label>
+                    <select
+                      name="to"
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {users.map((user) => (
+                        <option key={user} value={user}>
+                          {user}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Option avances personnelles */}
+                <div className="border-2 border-orange-200 rounded-xl p-4 bg-orange-50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      id="settlesPersonalDebts"
+                      name="settlesPersonalDebts"
+                      className="w-5 h-5 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+                    />
+                    <label
+                      htmlFor="settlesPersonalDebts"
+                      className="text-sm font-semibold text-gray-800 cursor-pointer"
+                    >
+                      Ce paiement règle des avances personnelles
+                    </label>
+                  </div>
+
+                  {/* Sélecteur d'avances (caché par défaut) */}
+                  <div
+                    id="personalDebtsSelector"
+                    className="space-y-2 mt-3 hidden"
+                  >
+                    <p className="text-sm text-gray-600 mb-2">
+                      Sélectionnez les avances réglées par ce paiement :
+                    </p>
+
+                    {personalDebts.filter((debt) => !debt.isPaid).length > 0 ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {personalDebts
+                          .filter((debt) => !debt.isPaid)
+                          .map((debt) => (
+                            <div
+                              key={debt._id}
+                              className="flex items-start gap-2 p-3 bg-white rounded-lg hover:bg-orange-50 transition"
+                            >
+                              <input
+                                type="checkbox"
+                                name="personalDebtIds"
+                                value={debt._id}
+                                className="mt-1 w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+                              />
+                              <label className="text-sm flex-1 cursor-pointer">
+                                <span className="font-semibold text-lg text-orange-600">
+                                  {debt.amount.toFixed(2)} €
+                                </span>
+                                {" - "}
+                                <span className="text-gray-800">
+                                  {debt.description}
+                                </span>{" "}
+                                <span className="text-gray-500 text-xs">
+                                  (
+                                  {new Date(debt.date).toLocaleDateString(
+                                    "fr-FR"
+                                  )}
+                                  )
+                                </span>
+                                <br />
+                                <span className="text-xs text-gray-600">
+                                  {debt.paidBy} a avancé pour {debt.owedBy}
+                                </span>
+                              </label>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic py-2">
+                        Aucune avance personnelle en attente
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Notes (optionnel)
+                  </label>
+                  <textarea
+                    name="notes"
+                    rows="2"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none resize-none"
+                    placeholder="Ex: Virement bancaire, espèces, PayPal..."
+                  />
+                </div>
+
+                {/* Bouton submit */}
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-700 transition shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  💸 Enregistrer le paiement
+                </button>
+              </form>
+            </div>
+
+            {/* ===== HISTORIQUE DES PAIEMENTS ===== */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg">
+              <h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center justify-between">
+                <span>📋 Historique des paiements du mois</span>
+                <span className="text-sm font-normal text-gray-500">
+                  {
+                    reimbursements.filter((reimb) => {
+                      const reimbDate = new Date(reimb.date);
+                      const startDate = new Date(
+                        selectedYear,
+                        selectedMonth,
+                        1
+                      );
+                      const endDate = new Date(
+                        selectedYear,
+                        selectedMonth + 1,
+                        0,
+                        23,
+                        59,
+                        59
+                      );
+                      return reimbDate >= startDate && reimbDate <= endDate;
+                    }).length
+                  }{" "}
+                  paiement(s)
+                </span>
+              </h3>
+
+              <div className="space-y-3">
+                {reimbursements.filter((reimb) => {
                   const reimbDate = new Date(reimb.date);
                   const startDate = new Date(selectedYear, selectedMonth, 1);
                   const endDate = new Date(
@@ -1599,29 +2100,113 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     59
                   );
                   return reimbDate >= startDate && reimbDate <= endDate;
-                })
-                .slice()
-                .reverse()
-                .map((reimb) => (
-                  <div
-                    key={reimb._id}
-                    className="p-4 bg-green-50 rounded-xl border-2 border-green-200"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold text-gray-800">
-                          {reimb.from} → {reimb.to}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(reimb.date).toLocaleDateString("fr-FR")}
-                        </p>
+                }).length > 0 ? (
+                  reimbursements
+                    .filter((reimb) => {
+                      const reimbDate = new Date(reimb.date);
+                      const startDate = new Date(
+                        selectedYear,
+                        selectedMonth,
+                        1
+                      );
+                      const endDate = new Date(
+                        selectedYear,
+                        selectedMonth + 1,
+                        0,
+                        23,
+                        59,
+                        59
+                      );
+                      return reimbDate >= startDate && reimbDate <= endDate;
+                    })
+                    .map((reimb) => (
+                      <div
+                        key={reimb._id}
+                        className="border-2 border-gray-200 rounded-xl p-4 hover:border-green-300 hover:shadow-md transition"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            {/* Montant et date */}
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-2xl font-bold text-green-600">
+                                {reimb.amount.toFixed(2)} €
+                              </span>
+                              <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                {new Date(reimb.date).toLocaleDateString(
+                                  "fr-FR"
+                                )}
+                              </span>
+                            </div>
+
+                            {/* De/À */}
+                            <p className="text-gray-700 mb-2">
+                              <span className="font-semibold">
+                                {reimb.from}
+                              </span>
+                              {" → "}
+                              <span className="font-semibold">{reimb.to}</span>
+                            </p>
+
+                            {/* Notes */}
+                            {reimb.notes && (
+                              <p className="text-sm text-gray-600 italic mb-2">
+                                📝 {reimb.notes}
+                              </p>
+                            )}
+
+                            {/* Avances associées */}
+                            {reimb.settlesPersonalDebts &&
+                              reimb.personalDebtIds &&
+                              reimb.personalDebtIds.length > 0 && (
+                                <div className="mt-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                  <p className="text-xs font-semibold text-orange-700 mb-2 flex items-center gap-1">
+                                    <span className="text-base">✅</span>A réglé{" "}
+                                    {reimb.personalDebtIds.length} avance(s)
+                                    personnelle(s)
+                                  </p>
+                                  <div className="space-y-1">
+                                    {reimb.personalDebtIds.map((debt) => (
+                                      <p
+                                        key={debt._id}
+                                        className="text-xs text-gray-700 pl-2 border-l-2 border-orange-300"
+                                      >
+                                        •{" "}
+                                        <span className="font-semibold">
+                                          {debt.amount.toFixed(2)} €
+                                        </span>{" "}
+                                        - {debt.description}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                          </div>
+
+                          {/* Bouton supprimer */}
+                          <button
+                            onClick={() => deleteReimbursement(reimb._id)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg ml-4 transition"
+                            title="Supprimer ce paiement"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-xl font-bold text-green-600">
-                        {reimb.amount.toFixed(2)} €
-                      </p>
-                    </div>
+                    ))
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 rounded-xl">
+                    <p className="text-gray-500 text-lg mb-2">
+                      Aucun paiement enregistré ce mois
+                    </p>
+                    <p className="text-gray-400 text-sm">
+                      Utilisez le formulaire ci-dessus pour enregistrer un
+                      paiement
+                    </p>
                   </div>
-                ))}
+                )}
+              </div>
+
+              {/* Total du mois */}
               {reimbursements.filter((reimb) => {
                 const reimbDate = new Date(reimb.date);
                 const startDate = new Date(selectedYear, selectedMonth, 1);
@@ -1634,183 +2219,212 @@ const ExpenseTracker = ({ user, onLogout }) => {
                   59
                 );
                 return reimbDate >= startDate && reimbDate <= endDate;
-              }).length === 0 && (
-                <p className="text-center text-gray-500 py-4">Aucun</p>
+              }).length > 0 && (
+                <div className="mt-4 pt-4 border-t-2 border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold text-gray-600">
+                      Total des paiements du mois :
+                    </span>
+                    <span className="text-xl font-bold text-green-600">
+                      {reimbursements
+                        .filter((reimb) => {
+                          const reimbDate = new Date(reimb.date);
+                          const startDate = new Date(
+                            selectedYear,
+                            selectedMonth,
+                            1
+                          );
+                          const endDate = new Date(
+                            selectedYear,
+                            selectedMonth + 1,
+                            0,
+                            23,
+                            59,
+                            59
+                          );
+                          return reimbDate >= startDate && reimbDate <= endDate;
+                        })
+                        .reduce((sum, reimb) => sum + reimb.amount, 0)
+                        .toFixed(2)}{" "}
+                      €
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           </div>
         )}
-      </div>
 
-      {/** MODALE EDITION DEPENSES RECURRENTES */}
-      {editingRecurring && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h3 className="text-xl font-bold text-gray-800">
-                Modifier la dépense récurrente
-              </h3>
-              <button
-                onClick={closeEditRecurring}
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-                aria-label="Fermer"
+        {/** MODALE EDITION DEPENSES RECURRENTES */}
+        {editingRecurring && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl">
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <h3 className="text-xl font-bold text-gray-800">
+                  Modifier la dépense récurrente
+                </h3>
+                <button
+                  onClick={closeEditRecurring}
+                  className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                  aria-label="Fermer"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form
+                onSubmit={submitEditRecurring}
+                className="px-6 py-6 space-y-4"
               >
-                ×
-              </button>
-            </div>
-
-            <form
-              onSubmit={submitEditRecurring}
-              className="px-6 py-6 space-y-4"
-            >
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Montant (€)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="amount"
-                    value={recurringForm.amount}
-                    onChange={handleRecurringFormChange}
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                  />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Montant (€)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="amount"
+                      value={recurringForm.amount}
+                      onChange={handleRecurringFormChange}
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Payé par
+                    </label>
+                    <select
+                      name="paidBy"
+                      value={recurringForm.paidBy}
+                      onChange={handleRecurringFormChange}
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {users.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Payé par
-                  </label>
-                  <select
-                    name="paidBy"
-                    value={recurringForm.paidBy}
-                    onChange={handleRecurringFormChange}
-                    required
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="">Sélectionner...</option>
-                    {users.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  name="description"
-                  value={recurringForm.description}
-                  onChange={handleRecurringFormChange}
-                  required
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Méthode
-                  </label>
-                  <select
-                    name="paymentMethod"
-                    value={recurringForm.paymentMethod}
-                    onChange={handleRecurringFormChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="">Sélectionner...</option>
-                    {paymentMethods.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Banque / Compte
+                    Description
                   </label>
                   <input
                     type="text"
-                    name="bankAccount"
-                    value={recurringForm.bankAccount}
-                    onChange={handleRecurringFormChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                    placeholder="Ex: Compte joint"
-                  />
-                </div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Catégorie
-                  </label>
-                  <select
-                    name="category"
-                    value={recurringForm.category}
-                    onChange={handleRecurringFormChange}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="">Sélectionner...</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Fréquence
-                  </label>
-                  <select
-                    name="recurrence"
-                    value={recurringForm.recurrence}
+                    name="description"
+                    value={recurringForm.description}
                     onChange={handleRecurringFormChange}
                     required
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
-                  >
-                    <option value="hebdomadaire">Hebdomadaire</option>
-                    <option value="mensuelle">Mensuelle</option>
-                    <option value="trimestrielle">Trimestrielle</option>
-                    <option value="annuelle">Annuelle</option>
-                  </select>
+                  />
                 </div>
-              </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeEditRecurring}
-                  className="px-4 py-2 rounded-lg border-2 border-gray-200 hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"
-                >
-                  Enregistrer
-                </button>
-              </div>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Méthode
+                    </label>
+                    <select
+                      name="paymentMethod"
+                      value={recurringForm.paymentMethod}
+                      onChange={handleRecurringFormChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {paymentMethods.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Banque / Compte
+                    </label>
+                    <input
+                      type="text"
+                      name="bankAccount"
+                      value={recurringForm.bankAccount}
+                      onChange={handleRecurringFormChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                      placeholder="Ex: Compte joint"
+                    />
+                  </div>
+                </div>
 
-              <p className="text-xs text-gray-500 pt-2">
-                ⚠️ Changer la fréquence modifie les prochaines générations. Les
-                dépenses déjà créées ce mois-ci sont mises à jour pour les
-                champs ci-dessus (montant, payeur, description, méthode, compte,
-                catégorie), mais leur date ne bouge pas.
-              </p>
-            </form>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Catégorie
+                    </label>
+                    <select
+                      name="category"
+                      value={recurringForm.category}
+                      onChange={handleRecurringFormChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Fréquence
+                    </label>
+                    <select
+                      name="recurrence"
+                      value={recurringForm.recurrence}
+                      onChange={handleRecurringFormChange}
+                      required
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                    >
+                      <option value="hebdomadaire">Hebdomadaire</option>
+                      <option value="mensuelle">Mensuelle</option>
+                      <option value="trimestrielle">Trimestrielle</option>
+                      <option value="annuelle">Annuelle</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={closeEditRecurring}
+                    className="px-4 py-2 rounded-lg border-2 border-gray-200 hover:bg-gray-50"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"
+                  >
+                    Enregistrer
+                  </button>
+                </div>
+
+                <p className="text-xs text-gray-500 pt-2">
+                  ⚠️ Changer la fréquence modifie les prochaines générations.
+                  Les dépenses déjà créées ce mois-ci sont mises à jour pour les
+                  champs ci-dessus (montant, payeur, description, méthode,
+                  compte, catégorie), mais leur date ne bouge pas.
+                </p>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
