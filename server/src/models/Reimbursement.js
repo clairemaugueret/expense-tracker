@@ -3,35 +3,25 @@ import mongoose from "mongoose";
 
 const reimbursementSchema = new mongoose.Schema(
   {
-    amount: {
-      type: Number,
-      required: [true, "Le montant est requis"],
-      min: [0, "Le montant doit être positif"],
-    },
+    amount: { type: Number, required: true, min: 0 },
     from: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: [true, "L'émetteur est requis"],
+      trim: true,
     },
     to: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: [true, "Le destinataire est requis"],
+      trim: true,
     },
-    date: {
-      type: Date,
-      required: [true, "La date est requise"],
-      default: Date.now,
-    },
+    date: { type: Date, required: true, default: Date.now },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 reimbursementSchema.pre("save", function (next) {
-  if (this.from.equals(this.to)) {
-    next(
+  if (this.from === this.to) {
+    return next(
       new Error("Le remboursement doit être entre deux personnes différentes")
     );
   }

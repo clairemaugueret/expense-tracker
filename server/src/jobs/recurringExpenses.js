@@ -42,13 +42,14 @@ export const startRecurringExpensesJob = () => {
           await Expense.create({
             amount: recurring.amount,
             date: nextDate,
-            paidBy: recurring.paidBy,
+            paidBy: recurring.paidBy || "Inconnu",
             description: recurring.description,
             paymentMethod: recurring.paymentMethod,
             bankAccount: recurring.bankAccount,
             category: recurring.category,
             isRecurring: true,
             recurringId: recurring._id,
+            addedBy: recurring.paidBy || "Inconnu",
           });
 
           // Mettre à jour la date de dernière génération

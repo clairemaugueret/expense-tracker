@@ -15,31 +15,26 @@ import reimbursementRoutes from "./routes/reimbursements.js";
 import recurringRoutes from "./routes/recurring.js";
 import personalDebtRoutes from "./routes/personalDebts.js";
 
-// Configuration
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connexion à la base de données
+// ✅ Tu peux commenter la ligne suivante si tu veux lancer sans Mongo :
 connectDB();
 
-// Middleware de sécurité
+// Sécurité et CORS
 app.use(helmet());
-
-// CORS
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true,
+    allowedHeaders: ["Content-Type", "x-username"],
   })
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limite de 100 requêtes par fenêtre
-});
+// Limiteur de requêtes
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use("/api", limiter);
 
 // Body parser
@@ -53,32 +48,24 @@ app.use("/api/reimbursements", reimbursementRoutes);
 app.use("/api/recurring", recurringRoutes);
 app.use("/api/personal-debts", personalDebtRoutes);
 
-// Route de test
-app.get("/api/health", (req, res) => {
+// Route test
+app.get("/api/health", (_, res) =>
   res.json({
     success: true,
-    message: "API fonctionne correctement",
+    message: "API OK",
     timestamp: new Date().toISOString(),
-  });
-});
+  })
+);
 
-// Gestion des erreurs 404
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: "Route non trouvée",
-  });
-});
-
-// Middleware de gestion des erreurs
+// Gestion des erreurs
+app.use((_, res) =>
+  res.status(404).json({ success: false, message: "Route non trouvée" })
+);
 app.use(errorHandler);
 
-// Démarrer le serveur
+// Lancement du serveur
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-  console.log(`📱 Environnement: ${process.env.NODE_ENV}`);
-
-  // Démarrer le job des dépenses récurrentes
+  console.log(`🚀 Serveur lancé sur le port ${PORT}`);
   startRecurringExpensesJob();
 });
 

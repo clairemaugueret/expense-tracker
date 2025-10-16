@@ -3,40 +3,25 @@ import mongoose from "mongoose";
 
 const expenseSchema = new mongoose.Schema(
   {
-    amount: {
-      type: Number,
-      required: [true, "Le montant est requis"],
-      min: [0, "Le montant doit être positif"],
-    },
-    date: {
-      type: Date,
-      required: [true, "La date est requise"],
-      default: Date.now,
-    },
+    amount: { type: Number, required: true, min: 0 },
+    date: { type: Date, required: true, default: Date.now },
     paidBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Le payeur est requis"],
-    },
-    addedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "L'ajouteur est requis"],
-    },
-    description: {
       type: String,
-      required: [true, "La description est requise"],
+      required: [true, "Le payeur est requis"],
       trim: true,
     },
+    addedBy: {
+      type: String,
+      required: [true, "L'ajouteur est requis"],
+      trim: true,
+    },
+    description: { type: String, required: true, trim: true },
     paymentMethod: {
       type: String,
       enum: ["CB", "Prélèvement", "Espèces", "Virement", ""],
       default: "",
     },
-    bankAccount: {
-      type: String,
-      default: "",
-    },
+    bankAccount: { type: String, default: "" },
     category: {
       type: String,
       enum: [
@@ -54,19 +39,14 @@ const expenseSchema = new mongoose.Schema(
       ],
       default: "",
     },
-    isRecurring: {
-      type: Boolean,
-      default: false,
-    },
+    isRecurring: { type: Boolean, default: false },
     recurringId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "RecurringExpense",
       default: null,
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 expenseSchema.index({ date: -1 });

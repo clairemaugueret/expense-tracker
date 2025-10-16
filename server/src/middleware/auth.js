@@ -1,37 +1,14 @@
 // server/src/middleware/auth.js
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+export const protect = (req, res, next) => {
+  const username = req.headers["x-username"];
 
-export const protect = async (req, res, next) => {
-  try {
-    let token;
-
-    if (req.headers.authorization?.startsWith("Bearer")) {
-      token = req.headers.authorization.split(" ")[1];
-    }
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Non autorisé - Token manquant",
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id);
-
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Utilisateur non trouvé",
-      });
-    }
-
-    next();
-  } catch (error) {
+  if (!username) {
     return res.status(401).json({
       success: false,
-      message: "Non autorisé - Token invalide",
+      message: "Non autorisé - Username manquant dans les en-têtes",
     });
   }
+
+  req.username = username;
+  next();
 };

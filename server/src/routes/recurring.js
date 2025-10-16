@@ -4,15 +4,13 @@ import RecurringExpense from "../models/RecurringExpense.js";
 import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
-
 router.use(protect);
 
 router.get("/", async (req, res, next) => {
   try {
-    const recurringExpenses = await RecurringExpense.find({ isActive: true })
-      .populate("paidBy", "username")
-      .sort({ createdAt: -1 });
-
+    const recurringExpenses = await RecurringExpense.find({
+      isActive: true,
+    }).sort({ createdAt: -1 });
     res.json({
       success: true,
       count: recurringExpenses.length,
@@ -30,13 +28,8 @@ router.put("/:id/deactivate", async (req, res, next) => {
       { isActive: false },
       { new: true }
     );
-
-    if (!recurringExpense) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Dépense récurrente non trouvée" });
-    }
-
+    if (!recurringExpense)
+      return res.status(404).json({ success: false, message: "Non trouvée" });
     res.json({ success: true, data: recurringExpense });
   } catch (error) {
     next(error);

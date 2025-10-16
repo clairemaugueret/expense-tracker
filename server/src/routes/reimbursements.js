@@ -5,16 +5,11 @@ import Reimbursement from "../models/Reimbursement.js";
 import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
-
 router.use(protect);
 
 router.get("/", async (req, res, next) => {
   try {
-    const reimbursements = await Reimbursement.find()
-      .populate("from", "username")
-      .populate("to", "username")
-      .sort({ date: -1 });
-
+    const reimbursements = await Reimbursement.find().sort({ date: -1 });
     res.json({
       success: true,
       count: reimbursements.length,
@@ -36,19 +31,11 @@ router.post(
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
-      if (!errors.isEmpty()) {
+      if (!errors.isEmpty())
         return res.status(400).json({ success: false, errors: errors.array() });
-      }
 
       const reimbursement = await Reimbursement.create(req.body);
-
-      const populatedReimbursement = await Reimbursement.findById(
-        reimbursement._id
-      )
-        .populate("from", "username")
-        .populate("to", "username");
-
-      res.status(201).json({ success: true, data: populatedReimbursement });
+      res.status(201).json({ success: true, data: reimbursement });
     } catch (error) {
       next(error);
     }

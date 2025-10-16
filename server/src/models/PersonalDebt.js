@@ -3,53 +3,36 @@ import mongoose from "mongoose";
 
 const personalDebtSchema = new mongoose.Schema(
   {
-    amount: {
-      type: Number,
-      required: [true, "Le montant est requis"],
-      min: [0, "Le montant doit être positif"],
-    },
+    amount: { type: Number, required: true, min: 0 },
     paidBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Le créancier est requis"],
-    },
-    owedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Le débiteur est requis"],
-    },
-    description: {
       type: String,
-      required: [true, "La description est requise"],
+      required: [true, "Le créancier est requis"],
       trim: true,
     },
-    date: {
-      type: Date,
-      required: [true, "La date est requise"],
-      default: Date.now,
+    owedBy: {
+      type: String,
+      required: [true, "Le débiteur est requis"],
+      trim: true,
     },
+    description: { type: String, required: true, trim: true },
+    date: { type: Date, required: true, default: Date.now },
     addedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: [true, "L'ajouteur est requis"],
+      trim: true,
     },
-    isPaid: {
-      type: Boolean,
-      default: false,
-    },
-    paidAt: {
-      type: Date,
-      default: null,
-    },
+    isPaid: { type: Boolean, default: false },
+    paidAt: { type: Date, default: null },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
+// Validation : créancier ≠ débiteur
 personalDebtSchema.pre("save", function (next) {
-  if (this.paidBy.equals(this.owedBy)) {
-    next(new Error("Le créancier et le débiteur doivent être différents"));
+  if (this.paidBy === this.owedBy) {
+    return next(
+      new Error("Le créancier et le débiteur doivent être différents")
+    );
   }
   next();
 });

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import {
-  authAPI,
   expensesAPI,
   personalDebtsAPI,
   reimbursementsAPI,
@@ -79,6 +78,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
   };
 
   useEffect(() => {
+    // Récupère la liste figée depuis le localStorage (créée au clic sur Auth.jsx)
+    const localUsers = JSON.parse(localStorage.getItem("users") || "[]");
+    setUsers(localUsers);
     loadAllData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, selectedYear]);
@@ -97,16 +99,14 @@ const ExpenseTracker = ({ user, onLogout }) => {
         59
       ).toISOString();
 
-      const [usersRes, expensesRes, debtsRes, reimbursementsRes, recurringRes] =
+      const [expensesRes, debtsRes, reimbursementsRes, recurringRes] =
         await Promise.all([
-          authAPI.getUsers(),
           expensesAPI.getAll({ startDate, endDate }),
           personalDebtsAPI.getAll(),
           reimbursementsAPI.getAll(),
           recurringAPI.getAll(),
         ]);
 
-      if (usersRes.success) setUsers(usersRes.data);
       if (expensesRes.success) setExpenses(expensesRes.data);
       if (debtsRes.success) setPersonalDebts(debtsRes.data);
       if (reimbursementsRes.success) setReimbursements(reimbursementsRes.data);
@@ -131,7 +131,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
       const expenseData = {
         ...formData,
         amount: parseFloat(formData.amount),
-        addedBy: user.id,
+        addedBy: user,
       };
 
       const response = await expensesAPI.create(expenseData);
@@ -302,33 +302,29 @@ const ExpenseTracker = ({ user, onLogout }) => {
     });
 
     // Utilisateurs (ordre 0/1 pour cohérence UI)
-    const user1Name = users[0]?.username || "Utilisateur 1";
-    const user2Name = users[1]?.username || "Utilisateur 2";
-    const user1Id = users[0]?._id;
-    const user2Id = users[1]?._id;
+    const user1Name = users[0] || "Utilisateur 1";
+    const user2Name = users[1] || "Utilisateur 2";
 
     const person1Total = monthlyExpenses
-      .filter((exp) => (exp.paidBy?._id || exp.paidBy) === user1Id)
+      .filter((exp) => exp.paidBy === user1Name)
       .reduce((sum, exp) => sum + exp.amount, 0);
 
     const person2Total = monthlyExpenses
-      .filter((exp) => (exp.paidBy?._id || exp.paidBy) === user2Id)
+      .filter((exp) => exp.paidBy === user2Name)
       .reduce((sum, exp) => sum + exp.amount, 0);
 
     const reimbursementAdjustment = monthlyReimbursements.reduce(
       (sum, reimb) => {
-        const fromId = reimb.from?._id || reimb.from;
-        if (fromId === user1Id) return sum - reimb.amount;
-        if (fromId === user2Id) return sum + reimb.amount;
+        if (reimb.from === user1Name) return sum - reimb.amount;
+        if (reimb.from === user2Name) return sum + reimb.amount;
         return sum;
       },
       0
     );
 
     const debtAdjustment = monthlyUnpaidDebts.reduce((sum, debt) => {
-      const owedById = debt.owedBy?._id || debt.owedBy;
-      if (owedById === user1Id) return sum - debt.amount;
-      if (owedById === user2Id) return sum + debt.amount;
+      if (debt.owedBy === user1Name) return sum - debt.amount;
+      if (debt.owedBy === user2Name) return sum + debt.amount;
       return sum;
     }, 0);
 
@@ -338,16 +334,16 @@ const ExpenseTracker = ({ user, onLogout }) => {
       person1Total - halfExpenses + reimbursementAdjustment + debtAdjustment;
 
     // Qui doit à qui (en IDs)
-    const owedById = difference > 0 ? user2Id : user1Id;
-    const owedToId = difference > 0 ? user1Id : user2Id;
+    const owedBy = difference > 0 ? user2Name : user1Name;
+    const owedTo = difference > 0 ? user1Name : user2Name;
 
     return {
       person1Total,
       person2Total,
       totalExpenses,
       owedAmount: Math.abs(difference),
-      owedById,
-      owedToId,
+      owedBy,
+      owedTo,
       user1: user1Name,
       user2: user2Name,
     };
@@ -355,15 +351,15 @@ const ExpenseTracker = ({ user, onLogout }) => {
 
   const calculatePersonalDebts = () => {
     const unpaidDebts = personalDebts.filter((debt) => !debt.isPaid);
-    const user1Id = users[0]?._id;
-    const user2Id = users[1]?._id;
+    const user1Name = users[0];
+    const user2Name = users[1];
 
     const person1Owes = unpaidDebts
-      .filter((debt) => (debt.owedBy?._id || debt.owedBy) === user1Id)
+      .filter((debt) => debt.owedBy === user1Name)
       .reduce((sum, debt) => sum + debt.amount, 0);
 
     const person2Owes = unpaidDebts
-      .filter((debt) => (debt.owedBy?._id || debt.owedBy) === user2Id)
+      .filter((debt) => debt.owedBy === user2Name)
       .reduce((sum, debt) => sum + debt.amount, 0);
 
     return { person1Owes, person2Owes };
@@ -405,8 +401,8 @@ const ExpenseTracker = ({ user, onLogout }) => {
           exp.date,
           exp.description,
           exp.amount,
-          exp.paidBy?.username || exp.paidBy,
-          exp.addedBy?.username || "N/A",
+          exp.paidBy,
+          exp.addedBy || "N/A",
           exp.category || "",
         ].join(",")
       ),
@@ -473,7 +469,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
               💰 Suivi des dépenses
             </h1>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">👤 {user.username}</span>
+              <span className="text-sm text-gray-600">👤 {user}</span>
               <button
                 onClick={onLogout}
                 className="text-sm bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
@@ -547,6 +543,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
         </div>
       </div>
 
+      {/** BANDEAU BOUTONS */}
       <div className="max-w-7xl mx-auto px-4 py-2">
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
           <button
@@ -613,7 +610,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                 : "bg-white text-gray-700 hover:bg-gray-50")
             }
           >
-            💳 Mes avances
+            💳 Avances
           </button>
           <button
             onClick={() => setView("reimburse")}
@@ -628,61 +625,39 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </button>
         </div>
 
+        {/** SECTION DASHBOARD */}
         {view === "dashboard" && (
           <div className="space-y-6">
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="text-sm font-semibold text-gray-600 mb-2">
-                  Total {balance.user1}
-                </h3>
-                <p className="text-3xl font-bold text-blue-600">
-                  {balance.person1Total.toFixed(2)} €
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="text-sm font-semibold text-gray-600 mb-2">
-                  Total {balance.user2}
-                </h3>
-                <p className="text-3xl font-bold text-indigo-600">
-                  {balance.person2Total.toFixed(2)} €
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-6 shadow-lg">
-                <h3 className="text-sm font-semibold text-gray-600 mb-2">
-                  Total du mois
-                </h3>
-                <p className="text-3xl font-bold text-gray-800">
-                  {balance.totalExpenses.toFixed(2)} €
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-6 shadow-lg text-white">
+            <div className="bg-gradient-to-r from-zinc-500 to-slate-600 rounded-2xl p-6 shadow-lg text-white">
               <h3 className="text-xl font-bold mb-4">
-                💳 Balance finale du mois
+                📋 Dépenses - pot commun
               </h3>
-              <p className="text-sm mb-2 opacity-90">
-                Pot commun + Avances personnelles non remboursées
-              </p>
-              {balance.owedAmount > 0 ? (
-                <p className="text-2xl">
-                  <span className="font-bold">
-                    {users.find((u) => u._id === balance.owedById)?.username ||
-                      "Utilisateur"}
-                  </span>{" "}
-                  doit{" "}
-                  <span className="font-bold text-3xl">
-                    {balance.owedAmount.toFixed(2)} €
-                  </span>{" "}
-                  à{" "}
-                  <span className="font-bold">
-                    {users.find((u) => u._id === balance.owedToId)?.username ||
-                      "Utilisateur"}
-                  </span>
-                </p>
-              ) : (
-                <p className="text-2xl font-bold">Aucune dette ! 🎉</p>
-              )}
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                    Total {balance.user1}
+                  </h3>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {balance.person1Total.toFixed(2)} €
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                    Total {balance.user2}
+                  </h3>
+                  <p className="text-3xl font-bold text-indigo-600">
+                    {balance.person2Total.toFixed(2)} €
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                    Total du mois
+                  </h3>
+                  <p className="text-3xl font-bold text-gray-800">
+                    {balance.totalExpenses.toFixed(2)} €
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl p-6 shadow-lg text-white">
@@ -690,18 +665,52 @@ const ExpenseTracker = ({ user, onLogout }) => {
                 💰 Avances personnelles
               </h3>
               <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm mb-1">{balance.user1} doit</p>
-                  <p className="text-3xl font-bold">
+                <div className="bg-white rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                    {balance.user1} doit
+                  </h3>
+                  <p className="text-3xl font-bold text-amber-600">
                     {personalDebtsBalance.person1Owes.toFixed(2)} €
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm mb-1">{balance.user2} doit</p>
-                  <p className="text-3xl font-bold">
+                <div className="bg-white rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                    {balance.user2} doit
+                  </h3>
+                  <p className="text-3xl font-bold text-amber-600">
                     {personalDebtsBalance.person2Owes.toFixed(2)} €
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-2xl p-6 shadow-lg text-white">
+              <h3 className="text-xl font-bold mb-4">
+                💳 Balance finale du mois
+              </h3>
+              <div className="bg-white rounded-2xl p-6 shadow-lg">
+                <h3 className="text-sm font-semibold text-gray-600 mb-2">
+                  Pot commun + Avances personnelles non remboursées
+                </h3>
+                {balance.owedAmount > 0 ? (
+                  <p className="text-2xl text-gray-600">
+                    <span className="font-bold">
+                      {balance.owedBy || "Utilisateur"}
+                    </span>{" "}
+                    doit{" "}
+                    <span className="font-bold text-3xl text-green-600">
+                      {balance.owedAmount.toFixed(2)} €
+                    </span>{" "}
+                    à{" "}
+                    <span className="font-bold">
+                      {balance.owedTo || "Utilisateur"}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="text-2xl font-bold text-green-600">
+                    Aucune dette ! 🎉
+                  </p>
+                )}
               </div>
             </div>
 
@@ -788,9 +797,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
                   required
                 >
                   <option value="">Sélectionner...</option>
-                  {users.map((u) => (
-                    <option key={u._id} value={u._id}>
-                      {u.username}
+                  {users.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </select>
@@ -967,7 +976,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                         59
                       );
                       return (
-                        (exp.paidBy?._id || exp.paidBy) === user.id &&
+                        exp.paidBy === user &&
                         expDate >= startDate &&
                         expDate <= endDate
                       );
@@ -1068,7 +1077,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                         59
                       );
                       return (
-                        (exp.paidBy?._id || exp.paidBy) !== user.id &&
+                        exp.paidBy !== user &&
                         expDate >= startDate &&
                         expDate <= endDate
                       );
@@ -1137,8 +1146,8 @@ const ExpenseTracker = ({ user, onLogout }) => {
                         {exp.description}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {exp.amount.toFixed(2)} € •{" "}
-                        {exp.paidBy?.username || exp.paidBy} • {exp.recurrence}
+                        {exp.amount.toFixed(2)} € • {exp.paidBy} •{" "}
+                        {exp.recurrence}
                       </p>
                     </div>
                     <span className="px-3 py-1 bg-purple-500 text-white rounded-lg text-sm font-semibold">
@@ -1161,7 +1170,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
               💳 Avance personnelle{" "}
               <span className="text-base font-semibold italic">
                 {" "}
-                Hors pot commun
+                (hors pot commun)
               </span>
             </h2>
 
@@ -1208,9 +1217,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
                   >
                     <option value="">Sélectionner...</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.username}
+                    {users.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
                       </option>
                     ))}
                   </select>
@@ -1225,9 +1234,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
                   >
                     <option value="">Sélectionner...</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.username}
+                    {users.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
                       </option>
                     ))}
                   </select>
@@ -1280,8 +1289,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                             📅 {new Date(debt.date).toLocaleDateString("fr-FR")}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {debt.paidBy?.username || debt.paidBy} →{" "}
-                            {debt.owedBy?.username || debt.owedBy}
+                            {debt.paidBy} → {debt.owedBy}
                           </p>
                         </div>
                         <div className="text-right">
@@ -1323,8 +1331,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                             {debt.description}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {debt.paidBy?.username || debt.paidBy} →{" "}
-                            {debt.owedBy?.username || debt.owedBy}
+                            {debt.paidBy} → {debt.owedBy}
                           </p>
                           <p className="text-xs text-gray-500">
                             Le{" "}
@@ -1360,9 +1367,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                   >
                     <option value="">Sélectionner...</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.username}
+                    {users.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
                       </option>
                     ))}
                   </select>
@@ -1377,9 +1384,9 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                   >
                     <option value="">Sélectionner...</option>
-                    {users.map((u) => (
-                      <option key={u._id} value={u._id}>
-                        {u.username}
+                    {users.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
                       </option>
                     ))}
                   </select>
@@ -1446,8 +1453,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-semibold text-gray-800">
-                          {reimb.from?.username || reimb.from} →{" "}
-                          {reimb.to?.username || reimb.to}
+                          {reimb.from} → {reimb.to}
                         </p>
                         <p className="text-sm text-gray-600">
                           {new Date(reimb.date).toLocaleDateString("fr-FR")}

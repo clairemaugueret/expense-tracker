@@ -1,26 +1,13 @@
 // client/src/utils/api.js
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-const getToken = () => {
-  return localStorage.getItem("token");
-};
-
-const getAuthHeaders = () => {
-  const token = getToken();
+// On lit le user depuis le localStorage
+const getJsonHeaders = () => {
+  const username = localStorage.getItem("currentUser") || "";
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
+    "x-username": username,
   };
-};
-
-// API Auth
-export const authAPI = {
-  getUsers: async () => {
-    const response = await fetch(`${API_URL}/auth/users`, {
-      headers: getAuthHeaders(),
-    });
-    return response.json();
-  },
 };
 
 // API Expenses
@@ -28,7 +15,7 @@ export const expensesAPI = {
   getAll: async (filters = {}) => {
     const queryParams = new URLSearchParams(filters).toString();
     const response = await fetch(`${API_URL}/expenses?${queryParams}`, {
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
     return response.json();
   },
@@ -36,7 +23,7 @@ export const expensesAPI = {
   create: async (expenseData) => {
     const response = await fetch(`${API_URL}/expenses`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
       body: JSON.stringify(expenseData),
     });
     return response.json();
@@ -45,18 +32,8 @@ export const expensesAPI = {
   delete: async (id) => {
     const response = await fetch(`${API_URL}/expenses/${id}`, {
       method: "DELETE",
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
-    return response.json();
-  },
-
-  getBalance: async (month, year) => {
-    const response = await fetch(
-      `${API_URL}/expenses/balance/monthly?month=${month}&year=${year}`,
-      {
-        headers: getAuthHeaders(),
-      }
-    );
     return response.json();
   },
 };
@@ -66,7 +43,7 @@ export const personalDebtsAPI = {
   getAll: async (isPaid) => {
     const query = isPaid !== undefined ? `?isPaid=${isPaid}` : "";
     const response = await fetch(`${API_URL}/personal-debts${query}`, {
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
     return response.json();
   },
@@ -74,7 +51,7 @@ export const personalDebtsAPI = {
   create: async (debtData) => {
     const response = await fetch(`${API_URL}/personal-debts`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
       body: JSON.stringify(debtData),
     });
     return response.json();
@@ -83,7 +60,7 @@ export const personalDebtsAPI = {
   markPaid: async (id) => {
     const response = await fetch(`${API_URL}/personal-debts/${id}/mark-paid`, {
       method: "PUT",
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
     return response.json();
   },
@@ -93,7 +70,7 @@ export const personalDebtsAPI = {
 export const reimbursementsAPI = {
   getAll: async () => {
     const response = await fetch(`${API_URL}/reimbursements`, {
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
     return response.json();
   },
@@ -101,7 +78,7 @@ export const reimbursementsAPI = {
   create: async (reimbursementData) => {
     const response = await fetch(`${API_URL}/reimbursements`, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
       body: JSON.stringify(reimbursementData),
     });
     return response.json();
@@ -112,7 +89,7 @@ export const reimbursementsAPI = {
 export const recurringAPI = {
   getAll: async () => {
     const response = await fetch(`${API_URL}/recurring`, {
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
     return response.json();
   },
@@ -120,7 +97,7 @@ export const recurringAPI = {
   deactivate: async (id) => {
     const response = await fetch(`${API_URL}/recurring/${id}/deactivate`, {
       method: "PUT",
-      headers: getAuthHeaders(),
+      headers: getJsonHeaders(),
     });
     return response.json();
   },

@@ -4,28 +4,31 @@ import Auth from "./components/Auth";
 import ExpenseTracker from "./components/ExpenseTracker";
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Vérifier si l'utilisateur est déjà connecté
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
+    const savedUsers = localStorage.getItem("users");
+    const savedCurrentUser = localStorage.getItem("currentUser");
 
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+    // Si jamais la liste n'existe pas, on l'initialise vide
+    if (!savedUsers) {
+      localStorage.setItem("users", JSON.stringify([]));
     }
+
+    if (savedCurrentUser) setCurrentUser(savedCurrentUser);
     setLoading(false);
   }, []);
 
-  const handleLogin = (userData) => {
-    setUser(userData);
+  const handleLogin = (username) => {
+    setCurrentUser(username);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
+    // On ne garde rien de l'auth locale
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("users");
+    setCurrentUser(null);
   };
 
   if (loading) {
@@ -36,11 +39,11 @@ function App() {
     );
   }
 
-  if (!user) {
+  if (!currentUser) {
     return <Auth onLogin={handleLogin} />;
   }
 
-  return <ExpenseTracker user={user} onLogout={handleLogout} />;
+  return <ExpenseTracker user={currentUser} onLogout={handleLogout} />;
 }
 
 export default App;
