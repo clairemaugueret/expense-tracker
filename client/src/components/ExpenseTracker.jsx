@@ -469,7 +469,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-800">
-              💰 ExpenseShare
+              💰 Suivi des dépenses
             </h1>
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">👤 {user.username}</span>
@@ -571,17 +571,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
             ➕ Ajouter
           </button>
           <button
-            onClick={() => setView("personalDebt")}
-            className={
-              "px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition " +
-              (view === "personalDebt"
-                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-50")
-            }
-          >
-            💳 Avance
-          </button>
-          <button
             onClick={() => setView("list")}
             className={
               "px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition " +
@@ -604,17 +593,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
             🔍 Partenaire
           </button>
           <button
-            onClick={() => setView("reimburse")}
-            className={
-              "px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition " +
-              (view === "reimburse"
-                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-50")
-            }
-          >
-            💸 Rembourser
-          </button>
-          <button
             onClick={() => setView("recurring")}
             className={
               "px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition " +
@@ -624,6 +602,28 @@ const ExpenseTracker = ({ user, onLogout }) => {
             }
           >
             🔄 Récurrentes
+          </button>
+          <button
+            onClick={() => setView("personalDebt")}
+            className={
+              "px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition " +
+              (view === "personalDebt"
+                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                : "bg-white text-gray-700 hover:bg-gray-50")
+            }
+          >
+            💳 Mes avances
+          </button>
+          <button
+            onClick={() => setView("reimburse")}
+            className={
+              "px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition " +
+              (view === "reimburse"
+                ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+                : "bg-white text-gray-700 hover:bg-gray-50")
+            }
+          >
+            💸 Rembourser
           </button>
         </div>
 
@@ -738,6 +738,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </div>
         )}
 
+        {/** SECTION AJOUTER */}
         {view === "add" && (
           <div className="bg-white rounded-2xl p-6 shadow-lg max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold mb-6 text-gray-800">
@@ -912,14 +913,256 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </div>
         )}
 
+        {/** SECTION MES DEPENSES */}
+        {view === "list" && (
+          <div className="bg-white rounded-2xl p-6 shadow-lg">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                📋 Mes dépenses
+              </h2>
+              <button
+                onClick={exportToExcel}
+                className="bg-green-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-600 transition"
+              >
+                📥 CSV
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Description
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Catégorie
+                    </th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+                      Montant
+                    </th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {expenses
+                    .filter((exp) => {
+                      const expDate = new Date(exp.date);
+                      const startDate = new Date(
+                        selectedYear,
+                        selectedMonth,
+                        1
+                      );
+                      const endDate = new Date(
+                        selectedYear,
+                        selectedMonth + 1,
+                        0,
+                        23,
+                        59,
+                        59
+                      );
+                      return (
+                        (exp.paidBy?._id || exp.paidBy) === user.id &&
+                        expDate >= startDate &&
+                        expDate <= endDate
+                      );
+                    })
+                    .slice()
+                    .reverse()
+                    .map((exp) => (
+                      <tr key={exp._id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm">
+                          {new Date(exp.date).toLocaleDateString("fr-FR")}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium">
+                          {exp.description}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
+                            {exp.category || "N/A"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-bold">
+                          {exp.amount.toFixed(2)} €
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => deleteExpense(exp._id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {expenses.filter((exp) => {
+                const expDate = new Date(exp.date);
+                const startDate = new Date(selectedYear, selectedMonth, 1);
+                const endDate = new Date(
+                  selectedYear,
+                  selectedMonth + 1,
+                  0,
+                  23,
+                  59,
+                  59
+                );
+                return (
+                  (exp.paidBy?.username === user.username ||
+                    exp.paidBy === user.username) &&
+                  expDate >= startDate &&
+                  expDate <= endDate
+                );
+              }).length === 0 && (
+                <p className="text-center text-gray-500 py-8">Aucune dépense</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/** SECTION PARTENAIRE */}
+        {view === "details" && (
+          <div className="bg-white rounded-2xl p-6 shadow-lg">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">
+              🔍 Dépenses du partenaire
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-blue-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Description
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Catégorie
+                    </th>
+                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+                      Montant
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {expenses
+                    .filter((exp) => {
+                      const expDate = new Date(exp.date);
+                      const startDate = new Date(
+                        selectedYear,
+                        selectedMonth,
+                        1
+                      );
+                      const endDate = new Date(
+                        selectedYear,
+                        selectedMonth + 1,
+                        0,
+                        23,
+                        59,
+                        59
+                      );
+                      return (
+                        (exp.paidBy?._id || exp.paidBy) !== user.id &&
+                        expDate >= startDate &&
+                        expDate <= endDate
+                      );
+                    })
+                    .slice()
+                    .reverse()
+                    .map((exp) => (
+                      <tr key={exp._id} className="hover:bg-blue-50">
+                        <td className="px-4 py-3 text-sm">
+                          {new Date(exp.date).toLocaleDateString("fr-FR")}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium">
+                          {exp.description}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs">
+                            {exp.category || "N/A"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-bold">
+                          {exp.amount.toFixed(2)} €
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              {expenses.filter((exp) => {
+                const expDate = new Date(exp.date);
+                const startDate = new Date(selectedYear, selectedMonth, 1);
+                const endDate = new Date(
+                  selectedYear,
+                  selectedMonth + 1,
+                  0,
+                  23,
+                  59,
+                  59
+                );
+                return (
+                  exp.paidBy?.username !== user.username &&
+                  exp.paidBy !== user.username &&
+                  expDate >= startDate &&
+                  expDate <= endDate
+                );
+              }).length === 0 && (
+                <p className="text-center text-gray-500 py-8">Aucune dépense</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/** SECTION DEPENSES RECURRENTE */}
+        {view === "recurring" && (
+          <div className="bg-white rounded-2xl p-6 shadow-lg">
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">
+              🔄 Dépenses récurrentes
+            </h2>
+            <div className="space-y-4">
+              {recurringExpenses.map((exp) => (
+                <div
+                  key={exp._id}
+                  className="p-4 bg-purple-50 rounded-xl border-2 border-purple-200"
+                >
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-gray-800">
+                        {exp.description}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {exp.amount.toFixed(2)} € •{" "}
+                        {exp.paidBy?.username || exp.paidBy} • {exp.recurrence}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-purple-500 text-white rounded-lg text-sm font-semibold">
+                      {exp.category}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {recurringExpenses.length === 0 && (
+                <p className="text-center text-gray-500 py-8">Aucune</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/** SECTION MES AVANCES */}
         {view === "personalDebt" && (
           <div className="bg-white rounded-2xl p-6 shadow-lg max-w-2xl mx-auto">
-            <div className="bg-orange-50 border-2 border-orange-300 rounded-xl p-4 mb-6">
-              <h3 className="font-bold text-orange-800">
-                💳 Avance personnelle
-              </h3>
-              <p className="text-sm text-orange-700 mt-2">Hors pot commun</p>
-            </div>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">
+              💳 Avance personnelle{" "}
+              <span className="text-base font-semibold italic">
+                {" "}
+                Hors pot commun
+              </span>
+            </h2>
 
             <form
               onSubmit={handleSubmitPersonalDebt}
@@ -1098,211 +1341,7 @@ const ExpenseTracker = ({ user, onLogout }) => {
           </div>
         )}
 
-        {view === "list" && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">
-                📋 Mes dépenses
-              </h2>
-              <button
-                onClick={exportToExcel}
-                className="bg-green-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-600 transition"
-              >
-                📥 CSV
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Catégorie
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-                      Montant
-                    </th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {expenses
-                    .filter((exp) => {
-                      const expDate = new Date(exp.date);
-                      const startDate = new Date(
-                        selectedYear,
-                        selectedMonth,
-                        1
-                      );
-                      const endDate = new Date(
-                        selectedYear,
-                        selectedMonth + 1,
-                        0,
-                        23,
-                        59,
-                        59
-                      );
-                      return (
-                        (exp.paidBy?._id || exp.paidBy) === user.id &&
-                        expDate >= startDate &&
-                        expDate <= endDate
-                      );
-                    })
-                    .slice()
-                    .reverse()
-                    .map((exp) => (
-                      <tr key={exp._id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm">
-                          {new Date(exp.date).toLocaleDateString("fr-FR")}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium">
-                          {exp.description}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs">
-                            {exp.category || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-bold">
-                          {exp.amount.toFixed(2)} €
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            onClick={() => deleteExpense(exp._id)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-              {expenses.filter((exp) => {
-                const expDate = new Date(exp.date);
-                const startDate = new Date(selectedYear, selectedMonth, 1);
-                const endDate = new Date(
-                  selectedYear,
-                  selectedMonth + 1,
-                  0,
-                  23,
-                  59,
-                  59
-                );
-                return (
-                  (exp.paidBy?.username === user.username ||
-                    exp.paidBy === user.username) &&
-                  expDate >= startDate &&
-                  expDate <= endDate
-                );
-              }).length === 0 && (
-                <p className="text-center text-gray-500 py-8">Aucune dépense</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {view === "details" && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-6">
-              <h3 className="font-bold text-blue-800">
-                🔍 Dépenses du partenaire
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-blue-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Description
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-                      Catégorie
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
-                      Montant
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {expenses
-                    .filter((exp) => {
-                      const expDate = new Date(exp.date);
-                      const startDate = new Date(
-                        selectedYear,
-                        selectedMonth,
-                        1
-                      );
-                      const endDate = new Date(
-                        selectedYear,
-                        selectedMonth + 1,
-                        0,
-                        23,
-                        59,
-                        59
-                      );
-                      return (
-                        (exp.paidBy?._id || exp.paidBy) !== user.id &&
-                        expDate >= startDate &&
-                        expDate <= endDate
-                      );
-                    })
-                    .slice()
-                    .reverse()
-                    .map((exp) => (
-                      <tr key={exp._id} className="hover:bg-blue-50">
-                        <td className="px-4 py-3 text-sm">
-                          {new Date(exp.date).toLocaleDateString("fr-FR")}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium">
-                          {exp.description}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs">
-                            {exp.category || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-bold">
-                          {exp.amount.toFixed(2)} €
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-              {expenses.filter((exp) => {
-                const expDate = new Date(exp.date);
-                const startDate = new Date(selectedYear, selectedMonth, 1);
-                const endDate = new Date(
-                  selectedYear,
-                  selectedMonth + 1,
-                  0,
-                  23,
-                  59,
-                  59
-                );
-                return (
-                  exp.paidBy?.username !== user.username &&
-                  exp.paidBy !== user.username &&
-                  expDate >= startDate &&
-                  expDate <= endDate
-                );
-              }).length === 0 && (
-                <p className="text-center text-gray-500 py-8">Aucune dépense</p>
-              )}
-            </div>
-          </div>
-        )}
-
+        {/** SECTION REMBOURSEMENT */}
         {view === "reimburse" && (
           <div className="bg-white rounded-2xl p-6 shadow-lg max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold mb-6 text-gray-800">
@@ -1433,40 +1472,6 @@ const ExpenseTracker = ({ user, onLogout }) => {
                 return reimbDate >= startDate && reimbDate <= endDate;
               }).length === 0 && (
                 <p className="text-center text-gray-500 py-4">Aucun</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {view === "recurring" && (
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">
-              🔄 Récurrentes
-            </h2>
-            <div className="space-y-4">
-              {recurringExpenses.map((exp) => (
-                <div
-                  key={exp._id}
-                  className="p-4 bg-purple-50 rounded-xl border-2 border-purple-200"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-gray-800">
-                        {exp.description}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {exp.amount.toFixed(2)} € •{" "}
-                        {exp.paidBy?.username || exp.paidBy} • {exp.recurrence}
-                      </p>
-                    </div>
-                    <span className="px-3 py-1 bg-purple-500 text-white rounded-lg text-sm font-semibold">
-                      {exp.category}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {recurringExpenses.length === 0 && (
-                <p className="text-center text-gray-500 py-8">Aucune</p>
               )}
             </div>
           </div>
