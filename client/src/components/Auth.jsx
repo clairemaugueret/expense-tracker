@@ -1,7 +1,6 @@
 // client/src/components/Auth.jsx
 import React from "react";
-
-const USERS = ["Claire", "Stéphane"];
+import { USERS } from "../utils/constants";
 
 const Auth = ({ onLogin }) => {
   const selectUser = (username) => {
