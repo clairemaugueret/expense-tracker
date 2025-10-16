@@ -455,24 +455,84 @@ const ExpenseTracker = ({ user, onLogout }) => {
         "Payé par",
         "Ajouté par",
         "Catégorie",
+        "Méthode",
+        "Compte",
       ].join(","),
       ...expenses.map((exp) =>
         [
-          exp.date,
+          new Date(exp.date).toLocaleDateString("fr-FR"),
+          exp.description,
+          exp.amount,
+          exp.paidBy,
+          exp.category || "N/A",
+          exp.paymentMethod || "-",
+          exp.bankAccount || "-",
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `depenses-${
+      monthNames[selectedMonth]
+    }-${selectedYear}_${user}_export-${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
+    link.click();
+  };
+
+  const exportPartnerToCSV = () => {
+    const partnerName = users.find((u) => u !== user);
+    const startDate = new Date(selectedYear, selectedMonth, 1);
+    const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+
+    const partnerExpenses = expenses.filter((exp) => {
+      const expDate = new Date(exp.date);
+      return (
+        exp.paidBy === partnerName && expDate >= startDate && expDate <= endDate
+      );
+    });
+
+    const csvContent = [
+      [
+        "Date",
+        "Description",
+        "Montant",
+        "Payé par",
+        "Ajouté par",
+        "Catégorie",
+        "Méthode",
+        "Compte",
+      ].join(","),
+      ...partnerExpenses.map((exp) =>
+        [
+          new Date(exp.date).toLocaleDateString("fr-FR"),
           exp.description,
           exp.amount,
           exp.paidBy,
           exp.addedBy || "N/A",
           exp.category || "",
+          exp.paymentMethod || "-",
+          exp.bankAccount || "-",
         ].join(",")
       ),
     ].join("\n");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download =
-      "depenses_" + new Date().toISOString().split("T")[0] + ".csv";
+    link.download = `depenses-${
+      monthNames[selectedMonth]
+    }-${selectedYear}_${partnerName}_export-${
+      new Date().toISOString().split("T")[0]
+    }.csv`;
     link.click();
   };
 
@@ -1102,9 +1162,17 @@ const ExpenseTracker = ({ user, onLogout }) => {
         {/** SECTION PARTENAIRE */}
         {view === "details" && (
           <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">
-              🔍 Dépenses du partenaire
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">
+                🔍 Dépenses du partenaire
+              </h2>
+              <button
+                onClick={exportPartnerToCSV}
+                className="bg-green-500 text-white px-4 py-2 rounded-xl font-semibold hover:bg-green-600 transition"
+              >
+                📥 CSV
+              </button>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">

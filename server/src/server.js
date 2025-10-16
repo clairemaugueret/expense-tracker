@@ -3,7 +3,6 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
 import connectDB from "./config/database.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { startRecurringExpensesJob } from "./jobs/recurringExpenses.js";
@@ -36,10 +35,6 @@ app.use(
     allowedHeaders: ["Content-Type", "x-username"],
   })
 );
-
-// Limiteur de requêtes
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
-app.use("/api", limiter);
 
 // Body parser
 app.use(express.json());
