@@ -58,9 +58,16 @@ const ExpenseTracker = ({ user, onLogout }) => {
     expenses,
     users,
     selectedMonth,
+    selectedYear,
+    personalDebts,
+    reimbursements
+  );
+  const personalDebtsBalance = calculatePersonalDebts(
+    personalDebts,
+    users,
+    selectedMonth,
     selectedYear
   );
-  const personalDebtsBalance = calculatePersonalDebts(personalDebts, users);
   const categoryData = getExpensesByCategory(
     expenses,
     selectedMonth,
@@ -189,6 +196,8 @@ const ExpenseTracker = ({ user, onLogout }) => {
           <PersonalDebtView
             users={users}
             personalDebts={personalDebts}
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
             onSubmit={addPersonalDebt}
             onMarkPaid={markDebtAsPaid}
           />

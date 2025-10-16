@@ -9,8 +9,10 @@ const CategoryPieChart = ({ data }) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-lg">
-      <h3 className="text-xl font-bold mb-4 text-gray-800">📊 Par catégorie</h3>
+    <div className="bg-gradient-to-r from-slate-300 to-gray-400 rounded-2xl p-6 shadow-lg">
+      <h3 className="text-xl font-bold mb-4 text-gray-700">
+        📊 Graphique des dépenses par catégorie
+      </h3>
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie

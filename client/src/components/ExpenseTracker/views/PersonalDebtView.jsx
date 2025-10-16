@@ -1,42 +1,49 @@
 // client/src/components/ExpenseTracker/views/PersonalDebtView.jsx
 import React from "react";
-import { getTodayISO } from "../../../utils/dateUtils";
+import { filterPersonalDebtsForDisplay } from "../../../utils/calculations";
 
-const PersonalDebtView = ({ users, personalDebts, onSubmit, onMarkPaid }) => {
+const PersonalDebtView = ({
+  users,
+  personalDebts,
+  selectedMonth,
+  selectedYear,
+  onSubmit,
+  onMarkPaid,
+}) => {
+  const unpaidDebts = filterPersonalDebtsForDisplay(
+    personalDebts,
+    selectedMonth,
+    selectedYear,
+    false
+  );
+  const paidDebts = filterPersonalDebtsForDisplay(
+    personalDebts,
+    selectedMonth,
+    selectedYear,
+    true
+  );
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    const amount = parseFloat(e.target.amount.value);
+    const paidBy = e.target.paidBy.value;
+    const owedBy = e.target.owedBy.value;
+    const description = e.target.description.value;
+    const date = e.target.date.value;
 
-    const debtData = {
-      amount: parseFloat(formData.get("amount")),
-      date: formData.get("date"),
-      paidBy: formData.get("paidBy"),
-      owedBy: formData.get("owedBy"),
-      description: formData.get("description"),
-    };
-
-    const result = await onSubmit(debtData);
-    if (result.success) {
-      alert("Avance enregistrée !");
-      e.target.reset();
-    } else {
-      alert(result.error || "Erreur lors de l'enregistrement");
+    if (!amount || !paidBy || !owedBy || !description) {
+      alert("Veuillez remplir tous les champs");
+      return;
     }
-  };
 
-  const handleMarkPaid = async (id) => {
-    if (window.confirm("Marquer cette avance comme payée ?")) {
-      const result = await onMarkPaid(id);
-      if (result.success) {
-        alert("Avance marquée comme payée !");
-      } else {
-        alert(result.error || "Erreur");
-      }
+    if (paidBy === owedBy) {
+      alert("Le payeur et le débiteur doivent être différents");
+      return;
     }
-  };
 
-  const unpaidDebts = personalDebts.filter((debt) => !debt.isPaid);
-  const paidDebts = personalDebts.filter((debt) => debt.isPaid);
+    await onSubmit({ amount, paidBy, owedBy, description, date });
+    e.target.reset();
+  };
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-lg max-w-2xl mx-auto">
@@ -47,6 +54,7 @@ const PersonalDebtView = ({ users, personalDebts, onSubmit, onMarkPaid }) => {
         </span>
       </h2>
 
+      {/* Formulaire d'ajout */}
       <form onSubmit={handleSubmit} className="space-y-4 mb-8">
         <div className="grid md:grid-cols-2 gap-4">
           <div>
@@ -69,7 +77,7 @@ const PersonalDebtView = ({ users, personalDebts, onSubmit, onMarkPaid }) => {
             <input
               type="date"
               name="date"
-              defaultValue={getTodayISO()}
+              defaultValue={new Date().toISOString().split("T")[0]}
               required
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
             />
@@ -79,34 +87,34 @@ const PersonalDebtView = ({ users, personalDebts, onSubmit, onMarkPaid }) => {
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Qui a avancé?
+              Qui a avancé ?
             </label>
             <select
               name="paidBy"
               required
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
             >
-              <option value="">Sélectionner...</option>
-              {users.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+              <option value="">Sélectionner</option>
+              {users.map((userName, idx) => (
+                <option key={idx} value={userName}>
+                  {userName}
                 </option>
               ))}
             </select>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Qui doit?
+              Qui doit ?
             </label>
             <select
               name="owedBy"
               required
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
             >
-              <option value="">Sélectionner...</option>
-              {users.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+              <option value="">Sélectionner</option>
+              {users.map((userName, idx) => (
+                <option key={idx} value={userName}>
+                  {userName}
                 </option>
               ))}
             </select>
@@ -122,59 +130,79 @@ const PersonalDebtView = ({ users, personalDebts, onSubmit, onMarkPaid }) => {
             name="description"
             required
             className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
-            placeholder="Ex: Réparation vélo"
+            placeholder="Ex: Courses, Restaurant..."
           />
         </div>
 
         <button
           type="submit"
-          className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white py-4 rounded-xl font-bold hover:from-orange-600 hover:to-red-700 transition-all shadow-lg"
+          className="w-full bg-gradient-to-r from-amber-500 to-orange-700 text-white py-3 rounded-xl font-bold hover:from-amber-600 hover:to-orange-700 transition"
         >
-          Enregistrer
+          💾 Enregistrer l'avance
         </button>
       </form>
 
-      <h3 className="text-xl font-bold mb-4 text-gray-800">💰 En cours</h3>
+      {/* Section des avances non remboursées */}
+      <h3 className="text-xl font-bold mb-4 text-gray-800">⏳ À rembourser</h3>
       <div className="space-y-3">
         {unpaidDebts.length === 0 ? (
-          <p className="text-center text-gray-500 py-4">
-            Aucune avance en cours
-          </p>
+          <p className="text-center text-gray-500 py-4">Aucune avance</p>
         ) : (
-          unpaidDebts.map((debt) => (
-            <div
-              key={debt._id}
-              className="p-4 bg-orange-50 rounded-xl border-2 border-orange-200"
-            >
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-bold text-gray-800">{debt.description}</p>
-                  <p className="text-sm text-gray-600">
-                    {debt.paidBy} → {debt.owedBy}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Le {new Date(debt.date).toLocaleDateString("fr-FR")}
-                  </p>
+          unpaidDebts
+            .slice()
+            .reverse()
+            .map((debt) => {
+              const debtDate = new Date(debt.date);
+              const currentMonthStart = new Date(
+                selectedYear,
+                selectedMonth,
+                1
+              );
+              const isPreviousMonth = debtDate < currentMonthStart;
+
+              return (
+                <div
+                  key={debt._id}
+                  className="p-4 bg-orange-50 rounded-xl border-2 border-orange-200"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-800">
+                        {debt.description}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        📅 {debtDate.toLocaleDateString("fr-FR")}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {debt.paidBy} → {debt.owedBy}
+                      </p>
+                      {isPreviousMonth && (
+                        <span className="inline-block mt-2 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                          📚 Mois précédent
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-orange-600">
+                        {debt.amount.toFixed(2)} €
+                      </p>
+                      <button
+                        onClick={() => onMarkPaid(debt._id)}
+                        className="mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-600 transition"
+                      >
+                        ✓ Payé ?
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <p className="text-xl font-bold text-orange-600">
-                    {debt.amount.toFixed(2)} €
-                  </p>
-                  <button
-                    onClick={() => handleMarkPaid(debt._id)}
-                    className="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 text-sm"
-                  >
-                    ✓ Payé
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
+              );
+            })
         )}
       </div>
 
+      {/* Section des avances remboursées (uniquement du mois actuel) */}
       <h3 className="text-xl font-bold mb-4 mt-8 text-gray-800">
-        ✅ Historique
+        ✅ Remboursées ce mois
       </h3>
       <div className="space-y-3">
         {paidDebts.length === 0 ? (
@@ -188,21 +216,28 @@ const PersonalDebtView = ({ users, personalDebts, onSubmit, onMarkPaid }) => {
                 key={debt._id}
                 className="p-4 bg-green-50 rounded-xl border-2 border-green-200 opacity-60"
               >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-gray-800 line-through">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-800">
                       {debt.description}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      📅 {new Date(debt.date).toLocaleDateString("fr-FR")}
                     </p>
                     <p className="text-sm text-gray-600">
                       {debt.paidBy} → {debt.owedBy}
                     </p>
-                    <p className="text-xs text-gray-500">
-                      Le {new Date(debt.paidAt).toLocaleDateString("fr-FR")}
-                    </p>
                   </div>
-                  <p className="text-xl font-bold text-green-600">
-                    {debt.amount.toFixed(2)} €
-                  </p>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-green-600">
+                      {debt.amount.toFixed(2)} €
+                    </p>
+                    {debt.paidAt && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        ✓ {new Date(debt.paidAt).toLocaleDateString("fr-FR")}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
